@@ -28,10 +28,11 @@ def draw_answer_route(start, end):
 
 x_range, y_range = draw_answer_route((0, 0), (100, -100))
 
-plt.plot(df['x_pos'], df['y_pos'])
-plt.plot(x_range, y_range)
-plt.hlines(0, -100, 100, ls=':')
-plt.vlines(0, -100, 100, ls=':')
+plt.plot(df['x_pos'], df['y_pos'], label='real_route', color='red')
+plt.plot(x_range, y_range, ls='--', label='answer_route', color='blue')
+plt.hlines(0, -30, 120, ls=':', colors='gray') # x축 긋기
+plt.vlines(0, -150, 25, ls=':', colors='gray')
 
 plt.grid()
+plt.legend()
 plt.show()
