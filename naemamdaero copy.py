@@ -3,7 +3,7 @@ import pandas as pd
 import time
 import math
 from collections.abc import Iterable
-import asyncio # 비동기코드
+
 
 
 def note_position(df: pd.DataFrame, value: Iterable):
@@ -69,9 +69,9 @@ def go_to_pos(target_pos: Iterable = (0, 0), allow_RMSE: float | int = 5, speed:
     while x_RMSE > allow_RMSE:
         pos = drone.get_pos_x(), drone.get_pos_y(), drone.get_pos_z()
         note_position(df=df, value=pos)
-
-        drone.set_roll(0)
-        if drone.get_pos_x() - target_x < 0: # x가 덜 나간 경우
+        now_x, now_y , _ = pos
+        drone.set_roll(0) # 좌우는 가만히
+        if now_x - target_x < 0: # x가 덜 나간 경우
             drone.set_pitch(speed)
         else: # x가 더 나간 경우
             drone.set_pitch(-speed)
@@ -85,9 +85,9 @@ def go_to_pos(target_pos: Iterable = (0, 0), allow_RMSE: float | int = 5, speed:
     while y_RMSE > allow_RMSE:
         pos = drone.get_pos_x(), drone.get_pos_y(), drone.get_pos_z()
         note_position(df=df, value=pos)
-
-        drone.set_pitch(0)
-        if drone.get_pos_y() - target_y < 0: # y가 덜 나간 경우
+        now_x, now_y , _ = pos
+        drone.set_pitch(0) # 앞뒤는 가만히
+        if now_y - target_y < 0: # y가 덜 나간 경우
             drone.set_roll(speed)
         else:
             drone.set_roll(-speed)
@@ -309,26 +309,26 @@ if __name__ == '__main__':
 
         ## 드론을 반시계 방향으로 돌리기
 
-        ## 보정 안한 버전
-        print("앞으로 가기")
-        go_to_pos_NoSupport(target_pos=(100, 0))
-        print("옆으로 가기")
-        go_to_pos_NoSupport(target_pos=(100, -100))
-        print("뒤로 가기")
-        go_to_pos_NoSupport(target_pos=(0, -100))
-        print("옆으로 가기")
-        go_to_pos_NoSupport(target_pos=(0, 0))
-        # 깡 착륙
-        drone.land()
+        # ## 보정 안한 버전
+        # print("앞으로 가기")
+        # go_to_pos_NoSupport(target_pos=(100, 0))
+        # print("옆으로 가기")
+        # go_to_pos_NoSupport(target_pos=(100, -100))
+        # print("뒤로 가기")
+        # go_to_pos_NoSupport(target_pos=(0, -100))
+        # print("옆으로 가기")
+        # go_to_pos_NoSupport(target_pos=(0, 0))
+        # # 깡 착륙
+        # drone.land()
 
-        # ## 보정한 버전
-        # go_to_pos(target_pos=(100, 0), allow_RMSE=20)
-        # go_to_pos(target_pos=(100, 100), allow_RMSE=20)
-        # go_to_pos(target_pos=(0, 100), allow_RMSE=20)
-        # go_to_pos(target_pos=(0, 0), allow_RMSE=20)
+        ## 보정한 버전
+        go_to_pos(target_pos=(100, 0), allow_RMSE=20)
+        go_to_pos(target_pos=(100, -100), allow_RMSE=20)
+        go_to_pos(target_pos=(0, -100), allow_RMSE=20)
+        go_to_pos(target_pos=(0, 0), allow_RMSE=20)
 
-        # # 보정 착륙
-        # landing_assist(target_pos=(0, 0), allow_RMSE=5)
+        # 보정 착륙
+        landing_assist(target_pos=(0, 0), allow_RMSE=5)
         
     except KeyboardInterrupt:
         print("\nCtrl + C 입력")
@@ -337,7 +337,7 @@ if __name__ == '__main__':
         drone.close()
         print("연결종료")
 
-        df.to_csv(f'csv_files/mycsv_{int(time.time())}.csv', index=False, header=True, columns=['x_pos', 'y_pos', 'z_pos'])
+        df.to_csv(f'csv_files/mycsv_{int(time.time())}_test.csv', index=False, header=True, columns=['x_pos', 'y_pos', 'z_pos'])
         # index : 첫 열에 순서 인덱스(0, 1, 2, ...)을 담을 것이냐
         # header = 맨 첫 행에 각 열의 이름('x_pos'와 같은 것)을 포함시킬 것이냐, 새로운 이음을 줄 거라면 리스트로 정해주기
         # columns = 어떤 열만을 어떤 순서로 저장할 것이냐
