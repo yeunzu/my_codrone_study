@@ -3,15 +3,8 @@ import pandas as pd
 import time
 import math
 from collections.abc import Iterable
+import asyncio # 비동기코드
 
-# 초기 설정
-drone = Drone()
-drone.pair()
-
-df = pd.DataFrame(columns=['x_pos', 'y_pos', 'z_pos'])
-is_Ctrl_C = False
-
-TIME_DELAY = 0.1
 
 def note_position(df: pd.DataFrame, value: Iterable):
     '''
@@ -122,8 +115,11 @@ def go_to_pos_NoSupport(target_pos: Iterable = (0, 0), speed: int = 20):
     global drone, df
     target_x, target_y = target_pos
     now_x, now_y = drone.get_pos_x(), drone.get_pos_y()
+
     if now_x < target_x:
         while now_x < target_x:
+            if target_x - now_x < 1: # x축 방향 초과가 1 이내면 반복깨기
+                break
             drone.set_pitch(speed)
             drone.move()
             time.sleep(TIME_DELAY)
@@ -135,6 +131,8 @@ def go_to_pos_NoSupport(target_pos: Iterable = (0, 0), speed: int = 20):
 
     if now_x > target_x:
         while now_x > target_x:
+            if now_x - target_x < 1: # x축 방향 초과가 1 이내면 반복깨기
+                break
             drone.set_pitch(-speed)
             drone.move()
             time.sleep(TIME_DELAY)
@@ -146,6 +144,8 @@ def go_to_pos_NoSupport(target_pos: Iterable = (0, 0), speed: int = 20):
 
     if now_y < target_y:
         while now_y < target_y:
+            if target_y - now_y < 1: # y축 방향 초과가 1 이내면 반복깨기
+                break
             drone.set_roll(-speed)
             drone.move()
             time.sleep(TIME_DELAY)
@@ -157,6 +157,8 @@ def go_to_pos_NoSupport(target_pos: Iterable = (0, 0), speed: int = 20):
 
     if now_y > target_y:
         while now_y > target_y:
+            if now_y - target_y < 1: # y축 방향 초과가 1 이내면 반복깨기
+                break
             drone.set_roll(speed)
             drone.move()
             time.sleep(TIME_DELAY)
@@ -165,6 +167,18 @@ def go_to_pos_NoSupport(target_pos: Iterable = (0, 0), speed: int = 20):
     drone.set_pitch(0)
     drone.set_roll(0)
     drone.move()
+
+# async def go_to_pos_async_NoSupport(target_pos: Iterable = (0, 0), speed: int = 20):
+#     '''
+#     TODO: 미완성코드
+#     '''
+#     pass # 미완성이니 일단 패스
+#     global drone, df
+#     target_x, target_y = target_pos
+#     now_x, now_y = drone.get_pos_x(), drone.get_pos_y()
+#     x_distence = target_x - now_x
+#     y_distence = target_y - now_y
+
 
 
 def turn_body(target_angle: float | int):
@@ -269,8 +283,24 @@ def landing_assist(stop_z_pos: float | int = 12, target_pos: Iterable = (0,0), a
     note_position(df=df, value=pos)
 
 if __name__ == '__main__':
+
+    # 초기 설정
     drone = Drone()
     drone.pair()
+
+    df = pd.DataFrame(columns=['x_pos', 'y_pos', 'z_pos'])
+    is_Ctrl_C = False
+
+    TIME_DELAY = 0.2
+
+    # 좌표 초기화
+    print("좌표 초기화")
+    # drone.reset_previous_land()
+    drone.position_data = [0, 0, 0, 0]
+
+    # 이륙 직전 좌표 & 이륙
+    now_x, now_y, now_z = drone.get_pos_x(), drone.get_pos_y(), drone.get_pos_z()
+    note_position(df=df, value=(now_x, now_y, now_z))
     drone.takeoff()
 
     try:
@@ -280,20 +310,24 @@ if __name__ == '__main__':
         ## 드론을 반시계 방향으로 돌리기
 
         ## 보정 안한 버전
+        print("앞으로 가기")
         go_to_pos_NoSupport(target_pos=(100, 0))
-        go_to_pos_NoSupport(target_pos=(100, 100))
-        go_to_pos_NoSupport(target_pos=(0, 100))
+        print("옆으로 가기")
+        go_to_pos_NoSupport(target_pos=(100, -100))
+        print("뒤로 가기")
+        go_to_pos_NoSupport(target_pos=(0, -100))
+        print("옆으로 가기")
         go_to_pos_NoSupport(target_pos=(0, 0))
         # 깡 착륙
         drone.land()
 
-        ## 보정한 버전
+        # ## 보정한 버전
         # go_to_pos(target_pos=(100, 0), allow_RMSE=20)
         # go_to_pos(target_pos=(100, 100), allow_RMSE=20)
         # go_to_pos(target_pos=(0, 100), allow_RMSE=20)
         # go_to_pos(target_pos=(0, 0), allow_RMSE=20)
 
-        # 보정 착륙
+        # # 보정 착륙
         # landing_assist(target_pos=(0, 0), allow_RMSE=5)
         
     except KeyboardInterrupt:
