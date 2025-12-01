@@ -145,7 +145,8 @@ class MyCodrone:
             self, 
             target_pos: Iterable = (0, 0), 
             allow_error: float | int = 5, 
-            speed: int = 20
+            speed: int = 20,
+            support_power: int = 10
     ):
         '''
         ## 드론을 원하는 좌표까지 옮겨주는 함수
@@ -186,6 +187,59 @@ class MyCodrone:
         now_x, now_y = self.drone.get_pos_x(), self.drone.get_pos_y()
         self.logger.debug(f"\tnow_pos(x, y): {(now_x, now_y)}")
 
+        # 일단 오차 처리 없이 쭉 가기
+        # x 먼저
+        self.logger.info("일단 오차 보정 없이 이동")
+        while target_x - now_x > 0: # 앞으로 가야 하는 경우
+            self.drone.set_pitch(speed)
+            self.drone.move()
+            time.sleep(self.TIME_DELAY)
+            # 데이터 기록
+            pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
+            self.note_position(pos_data)
+            now_x = pos_data[0] # 현재 x좌표 업데이트
+        self.drone.reset_move_values()
+        self.drone.move()
+        
+        while target_x - now_y < 0: # 뒤로 가야 하는 경우
+            self.drone.set_pitch(-speed)
+            self.drone.move()
+            time.sleep(self.TIME_DELAY)
+            # 데이터 기록
+            pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
+            self.note_position(pos_data)
+            now_x = pos_data[0] # 현재 x좌표 업데이트
+        self.drone.reset_move_values()
+        self.drone.move()
+
+        # x 움직인 이후 y 움직이기
+        while target_y - now_y > 0: # 왼쪽으로 가야 하는 경우
+            self.drone.set_roll(-speed)
+            self.drone.move()
+            time.sleep(self.TIME_DELAY)
+            # 데이터 기록
+            pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
+            self.note_position(pos_data)
+            now_y = pos_data[1]
+        self.drone.reset_move_values()
+        self.drone.move()
+
+        while target_y - now_y < 0: # 오른쪽으로 가야 하는 경우
+            self.drone.set_roll(speed)
+            self.drone.move()
+            time.sleep(self.TIME_DELAY)
+            # 데이터 기록
+            pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
+            self.note_position(pos_data)
+            now_y = pos_data[1]
+        self.drone.reset_move_values()
+        self.drone.move()
+
+        ## 이제 오차 보정할 차례
+        self.logger.info("이동 완료 후 오차 보정")
+        now_x, now_y = self.drone.get_pos_x(), self.drone.get_pos_y()
+        self.logger.debug(f"\tnow_pos(x, y): {(now_x, now_y)}")
+
         # x_error, y_error = abs(now_x) - abs(target_x), abs(now_y) - abs(target_y)
         now_error = math.sqrt((now_x - target_x)**2 + (now_y - target_y)**2)
         self.logger.debug(f"연산된 현재 오차: {now_error}")
@@ -195,7 +249,7 @@ class MyCodrone:
         self.logger.info("x 먼저 이동 중")
 
         now_error, previous_error = now_error, now_error
-        set_speed = speed
+        set_speed = support_power
 
         while now_error > allow_error: # 오차가 허용치 초과한다면
             self.logger.debug("오차가 허용치를 초과함")
@@ -527,10 +581,12 @@ if __name__ == '__main__':
         myDrone.drone.takeoff()
         myDrone.logger.info("드론 이륙")
         # myDrone.set_height(120)
-        myDrone.go_to_pos(target_pos=(100, 0))
-        # myDrone.go_to_pos(target_pos=(100, 100))
-        # myDrone.go_to_pos(target_pos=(0, 100))
-        # myDrone.go_to_pos(target_pos=(0, 0))
+        allow_err = 10
+        spt_pwr = 6
+        myDrone.go_to_pos(target_pos=(100, 0), allow_error=allow_err, support_power=spt_pwr)
+        myDrone.go_to_pos(target_pos=(100, 100), allow_error=allow_err, support_power=spt_pwr)
+        myDrone.go_to_pos(target_pos=(0, 100), allow_error=allow_err, support_power=spt_pwr)
+        myDrone.go_to_pos(target_pos=(0, 0), allow_error=allow_err, support_power=spt_pwr)
         myDrone.drone.land()
     except KeyboardInterrupt:
         myDrone.logger.warning("Ctrl+C 입력")
