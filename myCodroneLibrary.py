@@ -161,16 +161,16 @@ class MyCodrone:
             self.logger.error(f"ValueError\n\tgo_to_pos() 함수에서 target_pos는 정수 혹은 실수의 오로지 2개의 원소를 가지는 iterable이어야 합니다.\n\t입력된 target_pos: {target_pos}\n\ttarget_pos의 원소의 개수: {len(target_pos)}")
             raise ValueError(f"go_to_pos() 함수에서 target_pos는 정수 혹은 실수의 오로지 2개의 원소를 가지는 iterable이어야 합니다.\n\t입력된 target_pos: {target_pos}\n\ttarget_pos의 원소의 개수: {len(target_pos)}")
         
-        # for i in range(2): # target_pos를 순회하며 값을 검사
-        #     value = target_pos[i]
-        #     if ((type(value) != type(0)) or (type(value) != type(0.))): # target_pos로 받은 원소 2개가 int나 float가 아니면 TypeError
-        #         if (type(value) == type("ㅗ")): # 다만 원소가 문자열이면 실수로 변환하고 경고를 띄움
-        #             target_pos[i] = float(value) # 실수로 바꾼 값을 해당 인덱스에 저장
-        #             self.logger.warning("go_to_pos() 함수에서 target_pos의 원소는 문자열을 받을 수 없습니다. 따라서 자체적으로 실수로 변환해 사용합니다. 이 경우, 값에 이상이 생길 가능성이 있습니다.")
-        #             warnings.warn("go_to_pos() 함수에서 target_pos의 원소는 문자열을 받을 수 없습니다. 따라서 자체적으로 실수로 변환해 사용합니다. 이 경우, 값에 이상이 생길 가능성이 있습니다.", RuntimeWarning)
-        #         else: # 원소가 문자열조차도 아니면 TypeError
-        #             self.logger.error(f"TypeError\n\tgo_to_pos() 함수에서 target_pos의 원소는 오로지 정수 혹은 실수만을 받을 수 있습니다.\n\t문제가 되는 원소 값: {value}\n\t해당 값의 타입: {type(value)}\n\t문제가 되는 값의 인덱스: {i}")
-        #             raise TypeError(f"go_to_pos() 함수에서 target_pos의 원소는 오로지 정수 혹은 실수만을 받을 수 있습니다.\n\t문제가 되는 원소 값: {value}\n\t해당 값의 타입: {type(value)}\n\t문제가 되는 값의 인덱스: {i}")
+        for i in range(2): # target_pos를 순회하며 값을 검사
+            value = target_pos[i]
+            if ((type(value) != type(0)) and (type(value) != type(0.))): # target_pos로 받은 원소 2개가 int나 float가 아니면 TypeError
+                if (type(value) == type("ㅗ")): # 다만 원소가 문자열이면 실수로 변환하고 경고를 띄움
+                    target_pos[i] = float(value) # 실수로 바꾼 값을 해당 인덱스에 저장
+                    self.logger.warning("go_to_pos() 함수에서 target_pos의 원소는 문자열을 받을 수 없습니다. 따라서 자체적으로 실수로 변환해 사용합니다. 이 경우, 값에 이상이 생길 가능성이 있습니다.")
+                    warnings.warn("go_to_pos() 함수에서 target_pos의 원소는 문자열을 받을 수 없습니다. 따라서 자체적으로 실수로 변환해 사용합니다. 이 경우, 값에 이상이 생길 가능성이 있습니다.", RuntimeWarning)
+                else: # 원소가 문자열조차도 아니면 TypeError
+                    self.logger.error(f"TypeError\n\tgo_to_pos() 함수에서 target_pos의 원소는 오로지 정수 혹은 실수만을 받을 수 있습니다.\n\t문제가 되는 원소 값: {value}\n\t해당 값의 타입: {type(value)}\n\t문제가 되는 값의 인덱스: {i}")
+                    raise TypeError(f"go_to_pos() 함수에서 target_pos의 원소는 오로지 정수 혹은 실수만을 받을 수 있습니다.\n\t문제가 되는 원소 값: {value}\n\t해당 값의 타입: {type(value)}\n\t문제가 되는 값의 인덱스: {i}")
                 
         if not (0 < speed <= 100):
             self.logger.error(f"ValueError\n\tgo_to_pos() 함수에서 speed는 0보다 크고 100 이하인 정수이어야 합니다.\n\t입력된 speed: {speed}")
@@ -314,7 +314,7 @@ class MyCodrone:
         
         for i in range(2): # target_pos를 순회하며 값을 검사
             value = target_pos[i]
-            if ((type(value) != type(0)) or (type(value) != type(0.))): # target_pos로 받은 원소 2개가 int나 float가 아니면 TypeError
+            if ((type(value) != type(0)) and (type(value) != type(0.))): # target_pos로 받은 원소 2개가 int나 float가 아니면 TypeError
                 if (type(value) == type("ㅗ")): # 다만 원소가 문자열이면 실수로 변환하고 경고를 띄움
                     target_pos[i] = float(value) # 실수로 바꾼 값을 해당 인덱스에 저장
                     self.logger.warning("go_to_pos_NoSupport() 함수에서 target_pos의 원소는 문자열을 받을 수 없습니다. 따라서 자체적으로 실수로 변환해 사용합니다. 이 경우, 값에 이상이 생길 가능성이 있습니다.")
@@ -528,9 +528,9 @@ if __name__ == '__main__':
         myDrone.logger.info("드론 이륙")
         # myDrone.set_height(120)
         myDrone.go_to_pos(target_pos=(100, 0))
-        myDrone.go_to_pos(target_pos=(100, 100))
-        myDrone.go_to_pos(target_pos=(0, 100))
-        myDrone.go_to_pos(target_pos=(0, 0))
+        # myDrone.go_to_pos(target_pos=(100, 100))
+        # myDrone.go_to_pos(target_pos=(0, 100))
+        # myDrone.go_to_pos(target_pos=(0, 0))
         myDrone.drone.land()
     except KeyboardInterrupt:
         myDrone.logger.warning("Ctrl+C 입력")
