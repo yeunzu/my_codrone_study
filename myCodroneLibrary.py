@@ -94,59 +94,13 @@ class MyCodrone:
         # columns = 어떤 열만을 어떤 순서로 저장할 것이냐)
 
 
-    def go_straight(
-            self, 
-            length: float | int, 
-            speed: int = 20
-            ):
-        '''
-        ## 드론을 앞으로 이동시키는 함수
-        : 드론을 원하는 거리만큼 앞으로 이동시킵니다. 보다 정확히는 드론을 x좌표 상에서 이동시킵니다.
-
-        ### 파라미터 설명
-        - length: 앞으로 갈 거리를 cm 단위로 받습니다.
-        - speed: 드론의 속도를 조정합니다. 기본값은 20이며, 0보다 크고 100 이하인 정수를 받습니다.
-        '''
-        # 예외처리
-        if not (0 < speed <= 100):
-            raise ValueError(f"go_straight() 함수에서 speed는 0보다 크고 100 이하인 정수(int)만 허용됩니다.\n\t입력된 speed: {speed}\n\t입력된 speed의 type: {type(speed)}")
-        # 예외처리
-
-        start_x = self.drone.get_pos_x() # 이동 시작 전 드론의 x좌표를 기록해둡니다.
-        # print(f"앞으로 {length}cm 이동 시작")
-        self.logger.info(f"앞으로 {length}cm 이동 시작")
-
-        if length >= 0: # 주어진 거리가 0보다 큰, 즉 앞으로 가는 명령이라면
-            self.drone.set_pitch(speed)
-        else: # 주어진 거리가 0보다 작은, 즉 뒤로 가는 명령이라면
-            self.drone.set_pitch(-speed)
-
-        now_x = self.drone.get_pos_x() # 드론의 현재 x좌표 받음
-        moved_length = abs(now_x - start_x) # 거리 차이를 저장
-
-        # 거리차이가 이동 길이 이하인 경우 반복
-        while moved_length <= abs(length):
-            # 데이터 기록
-            pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
-            self.note_position(pos_data)
-
-            self.drone.move() # 앞서 설정된 pitch 값으로 이동
-
-            time.sleep(self.TIME_DELAY) # 반복문에 딜레이 주기
-
-        # 이동 완료 -> 이동 정보 초기화
-        self.drone.reset_move_values()
-        self.drone.move() # 초기화된 이동 정보를 반영 (혹시 모를 상황을 방지하기 위해 move()를 사용)
-        # print("앞으로 이동 종료")
-        self.logger.info("앞으로 이동 종료")
-
-
     def go_to_pos(
             self, 
             target_pos: Iterable = (0, 0), 
             allow_error: float | int = 5, 
+            decrease_speed_zone_range : float | int = 15, 
             speed: int = 20,
-            support_power: int = 10
+            decreased_speed: int = 10
     ):
         '''
         ## 드론을 원하는 좌표까지 옮겨주는 함수
@@ -154,8 +108,10 @@ class MyCodrone:
 
         ### 파라미터 설명
         - target_pos : 오로지 두 개의 원소(각 원소는 int 혹은 float)만을 가지는 iterable을 받습니다. 앞에서부터 순서대로 x, y를 의미합니다.
-        - allow_error : 허용할 오차 범위입니다. 목표 좌표를 기준으로 오차 범위만큼 x, y 평면에 원을 그린다고 가정할 때, 드론이 해당 원 안에 들어온다면 목표 좌표(target_pos)에 도달했다고 판단합니다.
+        - allow_error : 허용 오차 범위. 목표 좌표를 기준으로 오차 범위만큼 x, y 평면에 원을 그린다고 가정할 때, 드론이 해당 원 안에 들어온다면 목표 좌표(target_pos)에 도달했다고 판단합니다. 아래의 deceased_speed_zone_range보단 값의 크기가 반드시 작아야 합니다.
+        - decrease_speed_zone_range : 감속 보정 구간. 속도를 줄여 허용 오차 범위 안으로 들어가기 위한 보정을 시작할 범위를 지정합니다. 위의 allow_error보단 값의 크기가 반드시 커야 합니다.
         - speed : 드론의 속도를 조절합니다. 0보다 크고 100 이하인 정수만을 받습니다.
+        - decreased_speed : 감속 보정 구간에서 드론이 움직일 속도입니다.
         '''
         ## 예외처리
         if len(target_pos) != 2: # target_pos의 원소 개수가 2개가 아니면 ValueError
@@ -172,7 +128,10 @@ class MyCodrone:
                 else: # 원소가 문자열조차도 아니면 TypeError
                     self.logger.error(f"TypeError\n\tgo_to_pos() 함수에서 target_pos의 원소는 오로지 정수 혹은 실수만을 받을 수 있습니다.\n\t문제가 되는 원소 값: {value}\n\t해당 값의 타입: {type(value)}\n\t문제가 되는 값의 인덱스: {i}")
                     raise TypeError(f"go_to_pos() 함수에서 target_pos의 원소는 오로지 정수 혹은 실수만을 받을 수 있습니다.\n\t문제가 되는 원소 값: {value}\n\t해당 값의 타입: {type(value)}\n\t문제가 되는 값의 인덱스: {i}")
-                
+        if not (allow_error < decrease_speed_zone_range):
+            self.logger.error(f"ValueError\n\tgo_to_pos() 함수에서 allow_error와 decrease_speed_zone_range는 다음 관계를 반드시 만족해야 합니다. \tallow_error < decrease_speed_zone_range")
+            raise ValueError(f"ValueError\n\tgo_to_pos() 함수에서 allow_error와 decrease_speed_zone_range는 다음 관계를 반드시 만족해야 합니다. \tallow_error < decrease_speed_zone_range")
+
         if not (0 < speed <= 100):
             self.logger.error(f"ValueError\n\tgo_to_pos() 함수에서 speed는 0보다 크고 100 이하인 정수이어야 합니다.\n\t입력된 speed: {speed}")
             raise ValueError(f"go_to_pos() 함수에서 speed는 0보다 크고 100 이하인 정수이어야 합니다.\n\t입력된 speed: {speed}")
@@ -187,157 +146,87 @@ class MyCodrone:
         now_x, now_y = self.drone.get_pos_x(), self.drone.get_pos_y()
         self.logger.debug(f"\tnow_pos(x, y): {(now_x, now_y)}")
 
-        # 일단 오차 처리 없이 쭉 가기
+        distence = lambda now_x, now_y, target_x, target_y: math.sqrt((target_x - now_x)**2 + (target_y - now_y)**2) # 거리 계산 함수
+
+        # 1단계. 일단 오차 처리 없이 쭉 가기
         # x 먼저
         self.logger.info("일단 오차 보정 없이 이동")
-        while target_x - now_x > 0: # 앞으로 가야 하는 경우
+        while (target_x - now_x > 0) and (distence(now_x, now_y, target_x, target_y) > decrease_speed_zone_range): # 앞으로 가야 하는 경우
             self.drone.set_pitch(speed)
             self.drone.move()
             time.sleep(self.TIME_DELAY)
             # 데이터 기록
             pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
             self.note_position(pos_data)
-            now_x = pos_data[0] # 현재 x좌표 업데이트
+            # 좌표 업데이트
+            now_x, now_y = pos_data[0], pos_data[1]
         self.drone.reset_move_values()
         self.drone.move()
         
-        while target_x - now_y < 0: # 뒤로 가야 하는 경우
+        while (target_x - now_x < 0) and (distence(now_x, now_y, target_x, target_y) > decrease_speed_zone_range): # 뒤로 가야 하는 경우
             self.drone.set_pitch(-speed)
             self.drone.move()
             time.sleep(self.TIME_DELAY)
             # 데이터 기록
             pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
             self.note_position(pos_data)
-            now_x = pos_data[0] # 현재 x좌표 업데이트
+            # 좌표 업데이트
+            now_x, now_y = pos_data[0], pos_data[1]
         self.drone.reset_move_values()
         self.drone.move()
 
         # x 움직인 이후 y 움직이기
-        while target_y - now_y > 0: # 왼쪽으로 가야 하는 경우
+        while (target_y - now_y > 0) and (distence(now_x, now_y, target_x, target_y) > decrease_speed_zone_range): # 왼쪽으로 가야 하는 경우
             self.drone.set_roll(-speed)
             self.drone.move()
             time.sleep(self.TIME_DELAY)
             # 데이터 기록
             pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
             self.note_position(pos_data)
-            now_y = pos_data[1]
+            # 좌표 업데이트
+            now_x, now_y = pos_data[0], pos_data[1]
         self.drone.reset_move_values()
         self.drone.move()
 
-        while target_y - now_y < 0: # 오른쪽으로 가야 하는 경우
+        while (target_y - now_y < 0) and (distence(now_x, now_y, target_x, target_y) > decrease_speed_zone_range): # 오른쪽으로 가야 하는 경우
             self.drone.set_roll(speed)
             self.drone.move()
             time.sleep(self.TIME_DELAY)
             # 데이터 기록
             pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
             self.note_position(pos_data)
-            now_y = pos_data[1]
+            # 좌표 업데이트
+            now_x, now_y = pos_data[0], pos_data[1]
         self.drone.reset_move_values()
         self.drone.move()
 
-        ## 이제 오차 보정할 차례
-        self.logger.info("이동 완료 후 오차 보정")
-        now_x, now_y = self.drone.get_pos_x(), self.drone.get_pos_y()
-        self.logger.debug(f"\tnow_pos(x, y): {(now_x, now_y)}")
-
-        # x_error, y_error = abs(now_x) - abs(target_x), abs(now_y) - abs(target_y)
-        now_error = math.sqrt((now_x - target_x)**2 + (now_y - target_y)**2)
-        self.logger.debug(f"연산된 현재 오차: {now_error}")
-
-        # x 먼저 이동
-        # print("x 이동 중")
-        self.logger.info("x 먼저 이동 중")
-
-        now_error, previous_error = now_error, now_error
-        set_speed = support_power
-
-        while now_error > allow_error: # 오차가 허용치 초과한다면
-            self.logger.debug("오차가 허용치를 초과함")
-            # 데이터 기록
-            try:
-                self.logger.debug("좌표 데이터 기록")
-                pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
-                self.note_position(pos_data)
-            except Exception as e:
-                self.logger.error("오차가 허용치를 초과해 조정하기 위해 데이터를 기록하려던 중 에러 발생")
-                self.logger.error(f"{type(e).__name__}")
-                self.logger.error(f"\t{e}")
-                raise
-
-            # 좌표 정보 확보
-            self.logger.debug("좌표 정보 확보")
-            now_x, now_y = pos_data[0], pos_data[1]
-            self.drone.set_roll(0) # 좌우는 가만히
-
-            # 오차의 변화 경향 파악
-            self.logger.debug("오차 변화 경향 파악")
-            if previous_error - now_error >= 0: # 과거 오차에 비해 현재 오차가 적어짐 -> 오차가 줄어드는 경향
-                self.logger.debug("오차가 줄어드는 경향")
-                set_speed = set_speed # 그대로 유지
-            else: # 과거 오차에 비해 현재 오차가 커짐 -> 오차가 커지는 경향 -> 반대로 움직여줘소 오차를 잡아줘야 함
-                self.logger.debug("오차가 늘아나는 경향")
-                set_speed = -set_speed # 반대로 움직이게끔 부호 반전
-
-            self.drone.set_pitch(set_speed)
-                
-            # if now_x - target_x <0: # x가 앞으로 진행할 때 덜 나아갔거나, 뒤로 진행할 때 더 많이 나간 경우
-            #     self.drone.set_pitch(speed)
-            # else: # x가 양의 방향으로 더 나아갔거나, 음의 방향으로 덜 나아간 경우
-            #     self.drone.set_pitch(-speed)
-
-            self.drone.move()
-            self.logger.debug("드론 움직이고 딜래이")
-            time.sleep(self.TIME_DELAY)
-
-            # 오차 업데이트
-            now_x, now_y = self.drone.get_pos_x(), self.drone.get_pos_y()
-            # x_error, y_error = abs(now_x) - abs(target_x), abs(now_y) - abs(target_y)
-            self.logger.debug("오차 업데이트 전")
-            self.logger.debug(f"\tprevious_error: {previous_error} \tnow_error: {now_error}")
-            previous_error = now_error
-            now_error = math.sqrt((now_x - target_x)**2 + (now_y - target_y)**2)
-            self.logger.debug("오차 업데이트 후")
-            self.logger.debug(f"\tprevious_error: {previous_error} \tnow_error: {now_error}")
-            self.logger.info(f"현재 오차: {now_error}")
-            
-            if now_error <= allow_error:# 오차가 허용치 이내로 들어온다면 반복문 종료
-                break
-
-        # Y 이동
-        # print("y 이동 중")
-        self.logger.info("y 이동 중")
-        while now_error > allow_error: # 오차가 허용치를 초과한다면
-            # 데이터 기록
+        ## 2단계. 허용오차 안까지 느린 속도로 접근하기
+        ## 이제부턴 x와 y를 동시에 움직임
+        ## 이 움직임은 (감속구간)&(허용오차구간^(C))에서 작용. 즉, 감속 구간 안이지만, 오차를 허용하는 구간
+        while (allow_error < distence(now_x, now_y, target_x, target_y) <= decrease_speed_zone_range + 3): # 속도 감속 구간 범위에 3을 더한 것은 약간의 오차를 커버하기 위함
+            # 일단 현재 데이터 기록, 좌표 업데이트부터
             pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
             self.note_position(pos_data)
-
-            # 좌표 정보 확보
             now_x, now_y = pos_data[0], pos_data[1]
-            self.drone.set_pitch(0) #앞뒤는 가만히
-
-            # if now_y - target_y < 0: # y가 왼쪽으로 진행할 때 덜 나아갔거나, 오른쪽으로 진행할 때 더 나아간 경우
-            #     self.drone.set_roll(-speed)
-            # else: # y가 왼쪽으로 진행할 때 더 나아갔거나, 오른쪽으로 진행할 때 덜 나아간 경우
-            #     self.drone.set_roll(speed)
-
-            if previous_error - now_error > 0: # 과거 오차에 비해 현재 오차가 적어짐 -> 오차가 줄어드는 경향
-                set_speed = set_speed
-            else: # 과거 오차에 비해 현재 오차가 커짐 -> 오차가 커지는 경향 -> 반대로 움직여줘소 오차를 잡아줘야 함
-                set_speed = -set_speed # 반대로 움직이게끔 부호 반전
-            self.drone.set_roll(set_speed)
-
+            self.logger.info(f"목표와의 오차: {distence(now_x, now_y, target_x, target_y)}cm")
+            # x변화, y변화
+            x_diff = target_x - now_x
+            y_diff = target_y - now_y
+            # arctan을 이용해 각도 구하기
+            theta = math.atan2(y_diff, x_diff)
+            # pitch_power(앞뒤 움직임), roll_power(좌우 움직임) 계산 <- 삼각함수 이용
+            pitch_power = decreased_speed * math.cos(theta)
+            roll_power = decreased_speed * math.sin(theta)
+            # 연산이 올바른지 확인하기 위한 디버깅 로그
+            self.logger.debug(f"pitch_power: {pitch_power} \troll_power: {roll_power}")
+            self.logger.debug(f"pitch_power^2 + roll_power^2 = {pitch_power**2 + roll_power**2}")
+            self.logger.debug(f"decreased_speed^2 = {decreased_speed**2}")
+            self.logger.debug(f"is pitch_power^2 + roll_power^2 == decreased_speed^2 -> {int(pitch_power**2 + roll_power**2) == int(decreased_speed**2)}")
+            # pitch, roll 설정 및 움직임
+            self.drone.set_pitch(pitch_power)
+            self.drone.set_roll(-roll_power) # 이상하게 y좌표는 좌표상의 부호와, set_roll 함수 인자의 부하가 뒤집어져있어 부호를 바꿔줌
             self.drone.move()
             time.sleep(self.TIME_DELAY)
-
-            # 오차 업데이트
-            now_x, now_y = self.drone.get_pos_x(), self.drone.get_pos_y()
-            # x_error, y_error = abs(now_x) - abs(target_x), abs(now_y) - abs(target_y)
-            previous_error = now_error
-            now_error = math.sqrt((now_x - target_x)**2 + (now_y - target_y)**2)
-            self.logger.info(f"현재 오차: {now_error}")
-
-            if now_error <= allow_error:# 오차가 허용치 이내로 들어온다면 반복문 종료
-                break
 
         # 이동 정보 초기화
         self.drone.reset_move_values()
@@ -348,102 +237,6 @@ class MyCodrone:
         pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
         self.note_position(pos_data)
         
-
-    def go_to_pos_NoSupport(
-            self, 
-            target_pos: Iterable = (0, 0), 
-            speed: int = 20
-    ):
-        '''
-        ### 드론을 원하는 좌표까지 옮겨주는 함수
-        드론 동체의 회전 없이 드론을 원하는 좌표로 이동시킵니다.
-        좌표에 도달하면 동작을 멈추는 단순한 동작만을 합니다. 별도의 오차범위를 고려하지 않습니다.
-        - target_pos : 오로지 두 개의 원소(각 원소는 int 혹은 float)만을 가지는 iterable을 받습니다. 앞에서부터 순서대로 x, y를 의미합니다.
-        - speed : 드론의 속도를 조정합니다. 0 < speed <= 100의 정수만 받습니다.
-        '''
-        ## 예외처리
-        if len(target_pos) != 2: # target_pos의 원소 개수가 2개가 아니면 ValueError
-            self.logger.error(f"ValueError\n\tgo_to_pos() 함수에서 target_pos는 정수 혹은 실수의 오로지 2개의 원소를 가지는 iterable이어야 합니다.\n\t입력된 target_pos: {target_pos}\n\ttarget_pos의 원소의 개수: {len(target_pos)}")
-            raise ValueError(f"go_to_pos_NoSupport() 함수에서 target_pos는 정수 혹은 실수의 오로지 2개의 원소를 가지는 iterable이어야 합니다.\n\t입력된 target_pos: {target_pos}\n\ttarget_pos의 원소의 개수: {len(target_pos)}")
-        
-        for i in range(2): # target_pos를 순회하며 값을 검사
-            value = target_pos[i]
-            if ((type(value) != type(0)) and (type(value) != type(0.))): # target_pos로 받은 원소 2개가 int나 float가 아니면 TypeError
-                if (type(value) == type("ㅗ")): # 다만 원소가 문자열이면 실수로 변환하고 경고를 띄움
-                    target_pos[i] = float(value) # 실수로 바꾼 값을 해당 인덱스에 저장
-                    self.logger.warning("go_to_pos_NoSupport() 함수에서 target_pos의 원소는 문자열을 받을 수 없습니다. 따라서 자체적으로 실수로 변환해 사용합니다. 이 경우, 값에 이상이 생길 가능성이 있습니다.")
-                    warnings.warn("go_to_pos_NoSupport() 함수에서 target_pos의 원소는 문자열을 받을 수 없습니다. 따라서 자체적으로 실수로 변환해 사용합니다. 이 경우, 값에 이상이 생길 가능성이 있습니다.", RuntimeWarning)
-                else: # 원소가 문자열조차도 아니면 TypeError
-                    self.logger.error(f"TypeError\n\tgo_to_pos_NoSupport() 함수에서 target_pos의 원소는 오로지 정수 혹은 실수만을 받을 수 있습니다.\n\t문제가 되는 원소 값: {value}\n\t문제가 되는 값의 인덱스: {i}")
-                    raise TypeError(f"go_to_pos_NoSupport() 함수에서 target_pos의 원소는 오로지 정수 혹은 실수만을 받을 수 있습니다.\n\t문제가 되는 원소 값: {value}\n\t문제가 되는 값의 인덱스: {i}")
-                
-        if not (0 < speed <= 100):
-            self.logger.error(f"ValueError\n\tgo_to_pos_NoSupport() 함수에서 speed는 0보다 크고 100 이하인 정수이어야 합니다.\n\t입력된 speed: {speed}")
-            raise ValueError(f"go_to_pos_NoSupport() 함수에서 speed는 0보다 크고 100 이하인 정수이어야 합니다.\n\t입력된 speed: {speed}")
-        ## 예외처리
-
-        now_x, now_y = self.drone.get_pos_x(), self.drone.get_pos_y()
-        target_x, target_y = target_pos
-
-        while abs(now_x) < abs(target_x): # 원점 기준으로, 현재 x 거리가 목표 x 거리보다 짧은 경우
-            self.logger.info("+x 방향으로 이동")
-            if abs(abs(target_x) - abs(now_x)) < 1: # x축 방향 초과가 1 이내면 반복 깨기
-                break
-            self.drone.set_pitch(speed)
-            self.drone.move()
-            time.sleep(self.TIME_DELAY)
-            
-            # 데이터 기록
-            pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
-            self.note_position(pos_data)
-        self.drone.reset_move_values()
-        self.drone.move()
-
-        while abs(now_x) > abs(target_x): # 원점 기준으로, 현재 x 거리가 목표 x 거리보다 긴 경우
-            self.logger.info("-x 방향으로 이동")
-            if abs(abs(now_x) - abs(target_x)) < 1: # x축 방향 초과가 1 이내면 반복 깨기
-                break
-            self.drone.set_pitch(-speed)
-            self.drone.move()
-            time.sleep(self.TIME_DELAY)
-
-            # 데이터 기록
-            pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
-            self.note_position(pos_data)
-        self.drone.reset_move_values()
-        self.drone.move()
-
-        while abs(now_y) < abs(target_y): # 원점 기준으로, 현재 y 거리가 목표 y 거리보다 긴 경우
-            self.logger.info("-y 방향으로 이동")
-            if abs(abs(target_y) - abs(now_y)) < 1: # y축 방향 초과가 1 이내면 반복 깨기
-                break
-            self.drone.set_roll(speed)
-            self.drone.move()
-            time.sleep(self.TIME_DELAY)
-
-            # 데이터 기록
-            pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
-            self.note_position(pos_data)
-        self.drone.reset_move_values()
-        self.drone.move()
-
-        while abs(now_y) > abs(target_y):
-            self.logger.info("+y 방향으로 이동")
-            if abs(abs(now_y) - abs(target_y)) < 1: # y축 방향 초과가 1 이내면 반복 깨기
-                break
-            self.drone.set_roll(speed)
-            self.drone.move()
-            time.sleep(self.TIME_DELAY)
-            
-            # 데이터 기록
-            pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
-            self.note_position(pos_data)
-        self.drone.reset_move_values()
-        self.drone.move()
-
-        self.logger.info("지정한 좌표까지 보정 없이 이동완료")
-        pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
-        self.note_position(pos_data)
 
     def set_height(
             self, 
@@ -524,7 +317,7 @@ class MyCodrone:
         4. support_power는 z축 12cm 즈음에서 x, y축 위치를 보정할 때의 드론의 움직임 속도를 조절하는 인자입니다. 
         
         ## 주의사항
-        - 이 함수는 착륙하고자 하는 좌표(target_pos) 기준 허용 오차(allow_error)보다 3배 이상 먼 거리에 있는 경우엔 경고를 띄우며 착륙을 시행하지 않습니다. 지면에 거의 붙어있다시피 한 상태에서의 비행은 드론의 정상적인 비행이라고 보기 어려우며, 지면의 장애물에 의한 드론의 손상이 발생할 위함이 있기 때문입니다.
+        - 이 함수는 착륙하고자 하는 좌표(target_pos) 기준 허용 오차(allow_error)보다 5배 이상 먼 거리에 있는 경우엔 경고를 띄우며 착륙을 시행하지 않습니다. 지면에 거의 붙어있다시피 한 상태에서의 비행은 드론의 정상적인 비행이라고 보기 어려우며, 지면의 장애물에 의한 드론의 손상이 발생할 위함이 있기 때문입니다.
     
         '''
         ## 예외처리
@@ -534,7 +327,7 @@ class MyCodrone:
         
         for i in range(2): # target_pos를 순회하며 값을 검사
             value = target_pos[i]
-            if ((type(value) != type(0)) or (type(value) != type(0.))): # target_pos로 받은 원소 2개가 int나 float가 아니면 TypeError
+            if ((type(value) != type(0)) and (type(value) != type(0.))): # target_pos로 받은 원소 2개가 int나 float가 아니면 TypeError
                 if (type(value) == type("ㅗ")): # 다만 원소가 문자열이면 실수로 변환하고 경고를 띄움
                     target_pos[i] = float(value) # 실수로 바꾼 값을 해당 인덱스에 저장
                     self.logger.warning("landing_assist() 함수에서 target_pos의 원소는 문자열을 받을 수 없습니다. 따라서 자체적으로 실수로 변환해 사용합니다. 이 경우, 값에 이상이 생길 가능성이 있습니다.")
@@ -558,13 +351,63 @@ class MyCodrone:
         # 데이터 기록
         pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
         self.note_position(pos_data)
-        now_z = pos_data[-1]
+        now_x, now_y, now_z = pos_data
+
+        distence = lambda now_x, now_y, target_x, target_y: math.sqrt((target_x - now_x)**2 + (target_y - now_y))
+        now_distence = distence(now_x, now_y, target_x, target_y)
+
+        # 오차가 허용치의 3배 이상이면 착륙 중단
+        if now_distence >= 5*allow_error:
+            self.logger.warning("목표 x, y 좌표와의 거리가 허용 오차의 5배 이상입니다. 보정이 이뤄지는 착륙은 취소됩니다.")
+            self.logger.warning(f"허용 오차: {allow_error} \t현재 오차: {now_distence}")
+            return # 함수 탈출
         
         # 목표 높이까지 착륙 시작
         while now_z > stop_z_pos:
             pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
             self.note_position(pos_data)
             self.drone.set_throttle(-land_speed)
+            self.drone.move()
+            time.sleep(self.TIME_DELAY)
+
+        self.logger.info("목표 고도까지 하강완료")
+        self.drone.reset_move_values()
+        self.drone.move()
+
+        self.logger.info("보정 시작")
+        ## go_to_pos() 함수의 2단계 보정 시스템을 그대로 응용
+        while distence(now_x, now_y, target_x, target_y) > allow_error: # 
+            pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
+            self.note_position(pos_data)
+            now_x, now_y, now_z = pos_data
+            x_diff = target_x - now_x
+            y_diff = target_y - now_y
+            theta = math.atan2(y_diff, x_diff)
+            pitch_power = support_power * math.cos(theta)
+            roll_power = support_power * math.sin(theta)
+            # 연산이 올바른지 확인하기 위한 디버깅 로그
+            self.logger.debug(f"pitch_power: {pitch_power} \troll_power: {roll_power}")
+            self.logger.debug(f"pitch_power^2 + roll_power^2 = {pitch_power**2 + roll_power**2}")
+            self.logger.debug(f"decreased_speed^2 = {support_power**2}")
+            self.logger.debug(f"is pitch_power^2 + roll_power^2 == decreased_speed^2 -> {int(pitch_power**2 + roll_power**2) == int(support_power**2)}")
+            # 드론 값 설정
+            self.drone.set_pitch(pitch_power)
+            self.drone.set_roll(-roll_power)
+            self.drone.move()
+            time.sleep(self.TIME_DELAY)
+        
+        # 움직임 초기화
+        self.drone.reset_move_values()
+        self.drone.move()
+        # 완전 착륙 직전 데이터 기록
+        pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
+        self.note_position(pos_data)
+        self.drone.land()
+        # 완전 착륙 이후 데이터 기록
+        pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
+        self.note_position(pos_data)
+        self.logger.info("드론 착륙 완료")
+        self.logger.info(f"최종 착륙 좌표: {(pos_data[0], pos_data[1])}")
 
 
 
@@ -581,13 +424,15 @@ if __name__ == '__main__':
         myDrone.drone.takeoff()
         myDrone.logger.info("드론 이륙")
         # myDrone.set_height(120)
-        allow_err = 10
+        allow_err = 5
+        low_speed_zone = 10
         spt_pwr = 6
-        myDrone.go_to_pos(target_pos=(100, 0), allow_error=allow_err, support_power=spt_pwr)
-        myDrone.go_to_pos(target_pos=(100, 100), allow_error=allow_err, support_power=spt_pwr)
-        myDrone.go_to_pos(target_pos=(0, 100), allow_error=allow_err, support_power=spt_pwr)
-        myDrone.go_to_pos(target_pos=(0, 0), allow_error=allow_err, support_power=spt_pwr)
-        myDrone.drone.land()
+        myDrone.go_to_pos(target_pos=(100, 0), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
+        myDrone.go_to_pos(target_pos=(100, 100), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
+        myDrone.go_to_pos(target_pos=(0, 100), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
+        myDrone.go_to_pos(target_pos=(0, 0), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
+        # myDrone.drone.land()
+        myDrone.landing_assist(stop_z_pos=30, allow_error=5, target_pos=(0, 0), support_power=5)
     except KeyboardInterrupt:
         myDrone.logger.warning("Ctrl+C 입력")
         drone.land()

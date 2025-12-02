@@ -4,7 +4,8 @@ import pandas as pd
 # 보정 노
 # df = pd.read_csv("csv_files/mycsv_1764145716.csv")
 # df = pd.read_csv('csv_files/mycsv_1764144732.csv')
-df = pd.read_csv("csvs/csv_1764574582.csv")
+# df = pd.read_csv("csvs/csv_1764631837.csv") # 개잘된거 1
+df = pd.read_csv("csvs/csv_1764632162.csv") # 개잘된거 2
 
 class Draw_Correct_Course:
     '''
