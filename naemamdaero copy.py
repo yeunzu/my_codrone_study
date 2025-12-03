@@ -168,18 +168,6 @@ def go_to_pos_NoSupport(target_pos: Iterable = (0, 0), speed: int = 20):
     drone.set_roll(0)
     drone.move()
 
-# async def go_to_pos_async_NoSupport(target_pos: Iterable = (0, 0), speed: int = 20):
-#     '''
-#     TODO: 미완성코드
-#     '''
-#     pass # 미완성이니 일단 패스
-#     global drone, df
-#     target_x, target_y = target_pos
-#     now_x, now_y = drone.get_pos_x(), drone.get_pos_y()
-#     x_distence = target_x - now_x
-#     y_distence = target_y - now_y
-
-
 
 def turn_body(target_angle: float | int):
     '''
@@ -323,9 +311,9 @@ if __name__ == '__main__':
 
         ## 보정한 버전
         go_to_pos(target_pos=(100, 0), allow_RMSE=20)
-        go_to_pos(target_pos=(100, -100), allow_RMSE=20)
-        go_to_pos(target_pos=(0, -100), allow_RMSE=20)
-        go_to_pos(target_pos=(0, 0), allow_RMSE=20)
+        # go_to_pos(target_pos=(100, -100), allow_RMSE=20)
+        # go_to_pos(target_pos=(0, -100), allow_RMSE=20)
+        # go_to_pos(target_pos=(0, 0), allow_RMSE=20)
 
         # 보정 착륙
         landing_assist(target_pos=(0, 0), allow_RMSE=5)
