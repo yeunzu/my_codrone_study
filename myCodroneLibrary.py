@@ -315,10 +315,6 @@ class MyCodrone:
         2. 이후 x, y축을 보정한 후 착륙합니다.
         3. target_pos는 순서대로 x, y 좌표를 의미하는 두 개의 정수 혹은 실수의 원소로 이뤄진 iterable이어야 합니다.
         4. support_power는 z축 12cm 즈음에서 x, y축 위치를 보정할 때의 드론의 움직임 속도를 조절하는 인자입니다. 
-        
-        ## 주의사항
-        - 이 함수는 착륙하고자 하는 좌표(target_pos) 기준 허용 오차(allow_error)보다 5배 이상 먼 거리에 있는 경우엔 경고를 띄우며 착륙을 시행하지 않습니다. 지면에 거의 붙어있다시피 한 상태에서의 비행은 드론의 정상적인 비행이라고 보기 어려우며, 지면의 장애물에 의한 드론의 손상이 발생할 위함이 있기 때문입니다.
-    
         '''
         ## 예외처리
         if len(target_pos) != 2: # target_pos의 원소 개수가 2개가 아니면 ValueError
@@ -356,11 +352,11 @@ class MyCodrone:
         distence = lambda now_x, now_y, target_x, target_y: math.sqrt((target_x - now_x)**2 + (target_y - now_y))
         now_distence = distence(now_x, now_y, target_x, target_y)
 
-        # 오차가 허용치의 3배 이상이면 착륙 중단
-        if now_distence >= 5*allow_error:
-            self.logger.warning("목표 x, y 좌표와의 거리가 허용 오차의 5배 이상입니다. 보정이 이뤄지는 착륙은 취소됩니다.")
-            self.logger.warning(f"허용 오차: {allow_error} \t현재 오차: {now_distence}")
-            return # 함수 탈출
+        # # 오차가 허용치의 3배 이상이면 착륙 중단
+        # if now_distence >= 5*allow_error:
+        #     self.logger.warning("목표 x, y 좌표와의 거리가 허용 오차의 5배 이상입니다. 보정이 이뤄지는 착륙은 취소됩니다.")
+        #     self.logger.warning(f"허용 오차: {allow_error} \t현재 오차: {now_distence}")
+        #     return # 함수 탈출
         
         # 목표 높이까지 착륙 시작
         while now_z > stop_z_pos:
@@ -369,6 +365,7 @@ class MyCodrone:
             self.drone.set_throttle(-land_speed)
             self.drone.move()
             time.sleep(self.TIME_DELAY)
+            now_z = pos_data[2]
 
         self.logger.info("목표 고도까지 하강완료")
         self.drone.reset_move_values()
@@ -424,15 +421,17 @@ if __name__ == '__main__':
         myDrone.drone.takeoff()
         myDrone.logger.info("드론 이륙")
         # myDrone.set_height(120)
-        allow_err = 5
+        allow_err = 4
         low_speed_zone = 10
-        spt_pwr = 6
+        spt_pwr = 4
         myDrone.go_to_pos(target_pos=(100, 0), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
         myDrone.go_to_pos(target_pos=(100, 100), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
         myDrone.go_to_pos(target_pos=(0, 100), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
-        myDrone.go_to_pos(target_pos=(0, 0), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
+        # 마지막에 착륙 지점으로 올 때에는 오차 최소화를 위해 시작부터 느린 속도로...
+        myDrone.go_to_pos(target_pos=(0, 20), speed=10, allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr-2)
+        myDrone.go_to_pos(target_pos=(0, 0), speed=8, allow_error=2, decrease_speed_zone_range=8, decreased_speed=spt_pwr-2)
         # myDrone.drone.land()
-        myDrone.landing_assist(stop_z_pos=30, allow_error=5, target_pos=(0, 0), support_power=5)
+        myDrone.landing_assist(stop_z_pos=15, allow_error=2, target_pos=(0, 0), land_speed= 25, support_power=4)
     except KeyboardInterrupt:
         myDrone.logger.warning("Ctrl+C 입력")
         drone.land()

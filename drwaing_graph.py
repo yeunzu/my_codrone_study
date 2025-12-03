@@ -5,7 +5,10 @@ import pandas as pd
 # df = pd.read_csv("csv_files/mycsv_1764145716.csv")
 # df = pd.read_csv('csv_files/mycsv_1764144732.csv')
 # df = pd.read_csv("csvs/csv_1764631837.csv") # 개잘된거 1
-df = pd.read_csv("csvs/csv_1764632162.csv") # 개잘된거 2
+# df = pd.read_csv("csvs/csv_1764632162.csv") # 개잘된거 2
+# df = pd.read_csv("csvs/csv_1764645122.csv") # 가장 잘 된 거
+df = pd.read_csv("csvs/csv_1764645744.csv")
+
 
 class Draw_Correct_Course:
     '''
