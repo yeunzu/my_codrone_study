@@ -1,13 +1,8 @@
 import matplotlib.pyplot as plt
 import pandas as pd
+import math
 
-# 보정 노
-# df = pd.read_csv("csv_files/mycsv_1764145716.csv")
-# df = pd.read_csv('csv_files/mycsv_1764144732.csv')
-# df = pd.read_csv("csvs/csv_1764631837.csv") # 개잘된거 1
-# df = pd.read_csv("csvs/csv_1764632162.csv") # 개잘된거 2
-# df = pd.read_csv("csvs/csv_1764645122.csv") # 가장 잘 된 거
-df = pd.read_csv("csvs/csv_1764645744.csv")
+df = pd.read_csv("csvs/csv_1764751361.csv")
 
 
 class Draw_Correct_Course:
@@ -59,12 +54,17 @@ class Draw_Correct_Course:
     def get_course(self):
         return self.x_course, self.y_course
 
-## 정답 경로 생성하는 부분
+# ## 정답 경로 생성하는 부분
+# answer_course = Draw_Correct_Course()
+# answer_course.add_course(start_pos=(0, 0), end_pos=(100, 0))
+# answer_course.add_course(end_pos=(100, 100))
+# answer_course.add_course(end_pos=(0, 100))
+# answer_course.add_course(end_pos=(0, 0))
+# x_range, y_range = answer_course.get_course()
+
 answer_course = Draw_Correct_Course()
-answer_course.add_course(start_pos=(0, 0), end_pos=(100, 0))
-answer_course.add_course(end_pos=(100, 100))
-answer_course.add_course(end_pos=(0, 100))
-answer_course.add_course(end_pos=(0, 0))
+answer_course.add_course(start_pos=(0, 0), end_pos=(350, 0))
+answer_course.add_course(end_pos=(350, -450))
 x_range, y_range = answer_course.get_course()
 
 ## 선 그리는 부분
@@ -80,7 +80,25 @@ y_max = df['y_pos'].max() if df['y_pos'].max() > max(y_range) else max(y_range)
 plt.hlines(0, x_min-10, x_max+10, ls='dashdot', colors='black') # x축 긋기
 plt.vlines(0, y_min-10, y_max+10, ls='dashdot', colors='black') # y축 긋기
 
+# 벡터 합 연산(드론이 나아갈 방향 그리는 코드)
+target_x, target_y = 350, -450
+start_x, start_y = 0, 0
+x_diff = target_x - start_x
+y_diff = target_y - start_x
+tan_theta = y_diff / x_diff # tan(theta) 함수 값
+theta_radian = math.atan2(y_diff, x_diff) # theta 함수 값
+theta_degree = (theta_radian*180) / math.pi
+print(f"theta 각: {theta_degree:.3f}")
+vector_value = 100 # 벡터 값(벡터의 길이)
+vector_x = vector_value * math.cos(theta_radian) # 벡터 x 성분
+vector_y = vector_value * math.sin(theta_radian) # 벡터 y 성분
+plt.arrow(start_x, start_y, vector_x, vector_y, head_length = 20.0, head_width =20.0, width=10.0, fc='red', ec='orange') # 벡터 그리기
+
+# 벡터가 맞는지 확인하기 위한 점선 (화살표랑 점선이 서로 겹치면 벡터 연산이 맞다는 의미)
+plt.plot((start_x, target_x), (start_y, target_y), ls=":", color = 'gray')
+
 ## 완성된 그림 띄우는 부분
 plt.grid()
 plt.legend()
+plt.axis('equal') # x축과 y축 간격 일정하게
 plt.show()
