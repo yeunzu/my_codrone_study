@@ -93,6 +93,64 @@ class MyCodrone:
         # header = 맨 첫 행에 각 열의 이름('x_pos'와 같은 것)을 포함시킬 것이냐, 새로운 이음을 줄 거라면 리스트로 정해주기
         # columns = 어떤 열만을 어떤 순서로 저장할 것이냐)
 
+    def go_direct(
+            self,
+            target_pos: Iterable = (0, 0), 
+            allow_error: float | int = 5, 
+            decrease_speed_zone_range: float | int = 15, 
+            speed: int = 20, 
+            decreased_speed: int = 10
+    ):
+        pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
+        self.note_position(pos_data)
+        target_x, target_y = target_pos
+        now_x, now_y = pos_data[0], pos_data[1]
+        distence = lambda now_x, now_y, target_x, target_y: math.sqrt((target_x - now_x)**2 + (target_y - now_y)**2)
+
+        # 직선
+        x_diff = target_x - now_x
+        y_diff = target_y - now_y
+        theta_radian = math.atan2(y_diff, x_diff) # 각도 구하기(라디안)
+        theta_degree = (theta_radian * 180) / math.pi # 라디안 각도를 60분법으로 전환(디버깅용)
+        self.logger.debug(f"연산된 각도 (라디언) : {theta_radian:.3f})")
+        self.logger.debug(f"연산된 각도 (60분법) : {theta_degree:.3f}")
+        pitch_power = speed * math.cos(theta_radian)
+        roll_power = speed * math.sin(theta_radian)
+        self.drone.set_pitch(pitch_power)
+        self.drone.set_roll(-roll_power)
+        self.logger.debug(f"pitch 값: {pitch_power}")
+        self.logger.debug(f"roll 값: {-roll_power}")
+        now_distence = distence(now_x, now_y, target_x, target_y) # 현재 남은 거리 계산
+        while (now_distence > decrease_speed_zone_range):
+            self.logger.debug("이동")
+            self.drone.move()
+            time.sleep(self.TIME_DELAY)
+            pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
+            self.note_position(pos_data)
+            now_x, now_y = pos_data[0], pos_data[1]
+            now_distence = distence(now_x, now_y, target_x, target_y) # 현재 남은 거리 계산
+
+        self.drone.reset_move_values()
+        self.drone.move()
+        now_distence = distence(now_x, now_y, target_x, target_y) # 현재 남은 거리 계산
+        while (allow_error < now_distence <= decrease_speed_zone_range + 3):
+            x_diff = target_x - now_x
+            y_diff = target_y - now_y
+            theta_radian = math.atan2(y_diff, x_diff)
+            proper_speed = (now_distence / decrease_speed_zone_range) * decreased_speed+10 # 원래 8이었음
+            pitch_power = proper_speed * math.cos(theta_radian)
+            roll_power = proper_speed * math.sin(theta_radian)
+            self.drone.set_pitch(pitch_power)
+            self.drone.set_roll(-roll_power)
+            self.drone.move()
+            time.sleep(self.TIME_DELAY)
+            pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
+            self.note_position(pos_data)
+            now_x, now_y = pos_data[0], pos_data[1]
+            now_distence = distence(now_x, now_y, target_x, target_y) # 현재 남은 거리 계산
+        self.drone.reset_move_values()
+        self.drone.move()
+
 
     def go_to_pos(
             self, 
@@ -147,11 +205,15 @@ class MyCodrone:
         self.logger.debug(f"\tnow_pos(x, y): {(now_x, now_y)}")
 
         distence = lambda now_x, now_y, target_x, target_y: math.sqrt((target_x - now_x)**2 + (target_y - now_y)**2) # 거리 계산 함수
+        
+        self.is_x_forwarded = False
+        self.is_y_forwarded = False
 
         # 1단계. 일단 오차 처리 없이 쭉 가기
         # x 먼저
         self.logger.info("일단 오차 보정 없이 이동")
         while (target_x - now_x > 0) and (distence(now_x, now_y, target_x, target_y) > decrease_speed_zone_range): # 앞으로 가야 하는 경우
+            self.is_x_forwarded = True
             self.drone.set_pitch(speed)
             self.drone.move()
             time.sleep(self.TIME_DELAY)
@@ -163,7 +225,7 @@ class MyCodrone:
         self.drone.reset_move_values()
         self.drone.move()
         
-        while (target_x - now_x < 0) and (distence(now_x, now_y, target_x, target_y) > decrease_speed_zone_range): # 뒤로 가야 하는 경우
+        while (target_x - now_x < 0) and (distence(now_x, now_y, target_x, target_y) > decrease_speed_zone_range) and (not self.is_x_forwarded): # 뒤로 가야 하는 경우
             self.drone.set_pitch(-speed)
             self.drone.move()
             time.sleep(self.TIME_DELAY)
@@ -175,8 +237,11 @@ class MyCodrone:
         self.drone.reset_move_values()
         self.drone.move()
 
+        self.drone.hover(2)
+
         # x 움직인 이후 y 움직이기
         while (target_y - now_y > 0) and (distence(now_x, now_y, target_x, target_y) > decrease_speed_zone_range): # 왼쪽으로 가야 하는 경우
+            self.is_y_forwarded = True
             self.drone.set_roll(-speed)
             self.drone.move()
             time.sleep(self.TIME_DELAY)
@@ -188,7 +253,7 @@ class MyCodrone:
         self.drone.reset_move_values()
         self.drone.move()
 
-        while (target_y - now_y < 0) and (distence(now_x, now_y, target_x, target_y) > decrease_speed_zone_range): # 오른쪽으로 가야 하는 경우
+        while (target_y - now_y < 0) and (distence(now_x, now_y, target_x, target_y) > decrease_speed_zone_range) and (not self.is_y_forwarded): # 오른쪽으로 가야 하는 경우
             self.drone.set_roll(speed)
             self.drone.move()
             time.sleep(self.TIME_DELAY)
@@ -198,6 +263,8 @@ class MyCodrone:
             # 좌표 업데이트
             now_x, now_y = pos_data[0], pos_data[1]
         self.drone.reset_move_values()
+        self.drone.set_pitch(0)
+        self.drone.set_roll(0)
         self.drone.move()
 
         ## 2단계. 허용오차 안까지 느린 속도로 접근하기
@@ -214,9 +281,12 @@ class MyCodrone:
             y_diff = target_y - now_y
             # arctan을 이용해 각도 구하기
             theta = math.atan2(y_diff, x_diff)
+            # 속도 조절
+            now_distence = distence(now_x, now_y, target_x, target_y) # 현제 남은 거리 계산
+            proper_speed = (now_distence / decrease_speed_zone_range) * decreased_speed + 8
             # pitch_power(앞뒤 움직임), roll_power(좌우 움직임) 계산 <- 삼각함수 이용
-            pitch_power = decreased_speed * math.cos(theta)
-            roll_power = decreased_speed * math.sin(theta)
+            pitch_power = proper_speed * math.cos(theta)
+            roll_power = proper_speed * math.sin(theta)
             # 연산이 올바른지 확인하기 위한 디버깅 로그
             self.logger.debug(f"pitch_power: {pitch_power} \troll_power: {roll_power}")
             self.logger.debug(f"pitch_power^2 + roll_power^2 = {pitch_power**2 + roll_power**2}")
@@ -349,7 +419,7 @@ class MyCodrone:
         self.note_position(pos_data)
         now_x, now_y, now_z = pos_data
 
-        distence = lambda now_x, now_y, target_x, target_y: math.sqrt((target_x - now_x)**2 + (target_y - now_y))
+        distence = lambda now_x, now_y, target_x, target_y: math.sqrt((target_x - now_x)**2 + (target_y - now_y)**2)
         now_distence = distence(now_x, now_y, target_x, target_y)
 
         # # 오차가 허용치의 3배 이상이면 착륙 중단
@@ -372,23 +442,38 @@ class MyCodrone:
         self.drone.move()
 
         self.logger.info("보정 시작")
+
         ## go_to_pos() 함수의 2단계 보정 시스템을 그대로 응용
-        while distence(now_x, now_y, target_x, target_y) > allow_error: # 
+        distence = lambda now_x, now_y, target_x, target_y: math.sqrt((target_x - now_x)**2 + (target_y - now_y)**2)
+        while distence(now_x, now_y, target_x, target_y) > allow_error:
+            # 1. 현재 좌표 및 거리 획득
             pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
             self.note_position(pos_data)
             now_x, now_y, now_z = pos_data
+            
+            now_distence = distence(now_x, now_y, target_x, target_y)
+            
+            # 속도 감속: (최대 속도, 최대 속도 * 비율) 중 작은 값을 사용하며, 최소 속도(5) 이상을 보장
+            proper_speed = (now_distence / allow_error) * support_power + 5
+            # 3. 벡터 분해
             x_diff = target_x - now_x
             y_diff = target_y - now_y
             theta = math.atan2(y_diff, x_diff)
-            pitch_power = support_power * math.cos(theta)
-            roll_power = support_power * math.sin(theta)
-            # 연산이 올바른지 확인하기 위한 디버깅 로그
-            self.logger.debug(f"pitch_power: {pitch_power} \troll_power: {roll_power}")
-            self.logger.debug(f"pitch_power^2 + roll_power^2 = {pitch_power**2 + roll_power**2}")
-            self.logger.debug(f"decreased_speed^2 = {support_power**2}")
-            self.logger.debug(f"is pitch_power^2 + roll_power^2 == decreased_speed^2 -> {int(pitch_power**2 + roll_power**2) == int(support_power**2)}")
-            # 드론 값 설정
+            
+            # 감속된 속도를 총 힘으로 사용하여 Pitch/Roll 분배
+            pitch_power = proper_speed * math.cos(theta)
+            roll_power = proper_speed * math.sin(theta)
+            
+            # 연산 확인 디버깅 로그 (감속 속도로 업데이트)
+            self.logger.debug(f"Current Distance: {now_distence:.2f}, Propered Speed: {proper_speed:.2f}")
+            self.logger.debug(f"pitch_power: {pitch_power:.2f} \troll_power: {roll_power:.2f}")
+            self.logger.debug(f"pitch_power^2 + roll_power^2 = {pitch_power**2 + roll_power**2:.2f}")
+            self.logger.debug(f"proper_speed^2 = {proper_speed**2:.3f}")
+            self.logger.debug(f"now_error: {now_distence:.3f}")
+
+            # 4. 드론 값 설정 및 이동
             self.drone.set_pitch(pitch_power)
+            # CoDrone EDU의 Roll이 일반 좌표계와 반대일 수 있어 - 부호 적용 (기존 코드 유지)
             self.drone.set_roll(-roll_power)
             self.drone.move()
             time.sleep(self.TIME_DELAY)
@@ -399,6 +484,7 @@ class MyCodrone:
         # 완전 착륙 직전 데이터 기록
         pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
         self.note_position(pos_data)
+        # 완전 착륙 처리
         self.drone.land()
         # 완전 착륙 이후 데이터 기록
         pos_data = self.drone.get_pos_x(), self.drone.get_pos_y(), self.drone.get_pos_z()
@@ -406,7 +492,14 @@ class MyCodrone:
         self.logger.info("드론 착륙 완료")
         self.logger.info(f"최종 착륙 좌표: {(pos_data[0], pos_data[1])}")
 
-
+# def make_course(MyDrone: MyCodrone, x, y):
+#     allow_err = 4
+#     low_speed_zone = 10
+#     spt_pwr = 4
+#     MyDrone.go_to_pos((x, 0), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
+#     MyCodrone.go_to_pos((x, y * 1/3), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
+#     MyCodrone.go_to_pos((x, y * 2/3), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
+#     MyCodrone.go_to_pos((x, y), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
 
 
 
@@ -417,21 +510,40 @@ if __name__ == '__main__':
     df = pd.DataFrame(columns=["times", "x_pos", "y_pos", "z_pos"])
     try:
         myDrone = MyCodrone(drone=drone, df=df, save_logFile_directory="logs")
-        
+        drone_bettary = myDrone.drone.get_battery()
+        myDrone.logger.info(f"현재 남은 배터리 잔량: {drone_bettary}%")
         myDrone.drone.takeoff()
         myDrone.logger.info("드론 이륙")
-        # myDrone.set_height(120)
+        drive_speed = 50
         allow_err = 4
         low_speed_zone = 10
         spt_pwr = 4
-        myDrone.go_to_pos(target_pos=(100, 0), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
-        myDrone.go_to_pos(target_pos=(100, 100), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
-        myDrone.go_to_pos(target_pos=(0, 100), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
-        # 마지막에 착륙 지점으로 올 때에는 오차 최소화를 위해 시작부터 느린 속도로...
-        myDrone.go_to_pos(target_pos=(0, 20), speed=10, allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr-2)
-        myDrone.go_to_pos(target_pos=(0, 0), speed=8, allow_error=2, decrease_speed_zone_range=8, decreased_speed=spt_pwr-2)
+        # myDrone.go_to_pos(target_pos=(300, 0), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
+        # myDrone.go_to_pos(target_pos=(100, 100), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
+        # myDrone.go_to_pos(target_pos=(0, 100), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
+        # # 마지막에 착륙 지점으로 올 때에는 오차 최소화를 위해 시작부터 느린 속도로...
+        # myDrone.go_to_pos(target_pos=(0, 20), speed=10, allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr-2)
+        # myDrone.go_to_pos(target_pos=(0, 0), speed=8, allow_error=2, decrease_speed_zone_range=8, decreased_speed=spt_pwr-2)
         # myDrone.drone.land()
-        myDrone.landing_assist(stop_z_pos=15, allow_error=2, target_pos=(0, 0), land_speed= 25, support_power=4)
+        # # myDrone.landing_assist(stop_z_pos=20, allow_error=4, target_pos=(0, 0), land_speed= 25, support_power=4)
+
+        myDrone.set_height(150)
+        # myDrone.go_to_pos(target_pos=(380, -550), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
+
+        # x, y = 350, -475
+        x, y = 351, -506
+        # myDrone.go_to_pos(target_pos=(x, 0), speed=drive_speed, allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
+        # myDrone.drone.hover(1)
+        # myDrone.go_to_pos(target_pos=(x, y * 1/3), speed=drive_speed, allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
+        # myDrone.drone.hover(1)
+        # myDrone.go_to_pos(target_pos=(x, y * 2/3), speed=drive_speed, allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
+        # myDrone.drone.hover(1)
+        # myDrone.go_to_pos(target_pos=(x, y), speed=drive_speed, allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
+
+        myDrone.go_direct(target_pos=(x, y), speed=51, allow_error=3, decrease_speed_zone_range=80, decreased_speed=20)
+        myDrone.landing_assist(stop_z_pos=15, allow_error=5, target_pos=(x, y), land_speed=35, support_power=30)
+        # myDrone.drone.land()
+
     except KeyboardInterrupt:
         myDrone.logger.warning("Ctrl+C 입력")
         drone.land()
@@ -446,3 +558,7 @@ if __name__ == '__main__':
         drone.close()
         myDrone.save_csv(csv_path='csvs', csv_fileName=f'csv_{int(time.time())}')
         myDrone.logger.info("csv 저장 완료")
+        # drone_bettary = myDrone.drone.get_battery()
+        # myDrone.logger.info(f"현재 남은 배터리 잔량: {drone_bettary}%") # 신뢰성이 없어서 폐기
+
+## 참고 : 배터리 80% 언저리일 때 가장 깔끔
