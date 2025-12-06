@@ -2,7 +2,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import math
 
-df = pd.read_csv("csvs/csv_1764930995.csv")
+
+csv_file = "csvs/csv_1764930995.csv"
+df = pd.read_csv(csv_file)
 
 
 class Draw_Correct_Course:
