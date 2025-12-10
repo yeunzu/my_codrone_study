@@ -491,6 +491,9 @@ class MyCodrone:
         self.note_position(pos_data)
         self.logger.info("드론 착륙 완료")
         self.logger.info(f"최종 착륙 좌표: {(pos_data[0], pos_data[1])}")
+        now_x, now_y = pos_data[0], pos_data[1]
+        now_distence = distence(now_x, now_y, target_x, target_y)
+        self.logger.info(f"현재 오차: {now_distence}")
 
 # def make_course(MyDrone: MyCodrone, x, y):
 #     allow_err = 4
@@ -518,31 +521,12 @@ if __name__ == '__main__':
         allow_err = 4
         low_speed_zone = 10
         spt_pwr = 4
-        # myDrone.go_to_pos(target_pos=(300, 0), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
-        # myDrone.go_to_pos(target_pos=(100, 100), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
-        # myDrone.go_to_pos(target_pos=(0, 100), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
-        # # 마지막에 착륙 지점으로 올 때에는 오차 최소화를 위해 시작부터 느린 속도로...
-        # myDrone.go_to_pos(target_pos=(0, 20), speed=10, allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr-2)
-        # myDrone.go_to_pos(target_pos=(0, 0), speed=8, allow_error=2, decrease_speed_zone_range=8, decreased_speed=spt_pwr-2)
-        # myDrone.drone.land()
-        # # myDrone.landing_assist(stop_z_pos=20, allow_error=4, target_pos=(0, 0), land_speed= 25, support_power=4)
 
         myDrone.set_height(150)
-        # myDrone.go_to_pos(target_pos=(380, -550), allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
 
-        # x, y = 350, -475
         x, y = 351, -506
-        # myDrone.go_to_pos(target_pos=(x, 0), speed=drive_speed, allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
-        # myDrone.drone.hover(1)
-        # myDrone.go_to_pos(target_pos=(x, y * 1/3), speed=drive_speed, allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
-        # myDrone.drone.hover(1)
-        # myDrone.go_to_pos(target_pos=(x, y * 2/3), speed=drive_speed, allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
-        # myDrone.drone.hover(1)
-        # myDrone.go_to_pos(target_pos=(x, y), speed=drive_speed, allow_error=allow_err, decrease_speed_zone_range=low_speed_zone, decreased_speed=spt_pwr)
-
         myDrone.go_direct(target_pos=(x, y), speed=51, allow_error=3, decrease_speed_zone_range=80, decreased_speed=20)
         myDrone.landing_assist(stop_z_pos=15, allow_error=5, target_pos=(x, y), land_speed=35, support_power=30)
-        # myDrone.drone.land()
 
     except KeyboardInterrupt:
         myDrone.logger.warning("Ctrl+C 입력")
@@ -555,6 +539,7 @@ if __name__ == '__main__':
         raise
     finally:
         myDrone.logger.info("드론 착륙 후 연결 해제")
+        myDrone.drone.land() # 혹시 착륙 안되는 것을 대비한 기본 착륙 명령
         drone.close()
         myDrone.save_csv(csv_path='csvs', csv_fileName=f'csv_{int(time.time())}')
         myDrone.logger.info("csv 저장 완료")

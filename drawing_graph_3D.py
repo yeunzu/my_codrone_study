@@ -3,8 +3,14 @@ import pandas as pd
 import math
 
 
-csv_file = "csvs/csv_1764930995.csv"
+csv_file = "csvs/csv_1765351154.csv" # 1차
 df = pd.read_csv(csv_file)
+
+# # 과거 경로 중첩 비교를 위한 데이터 로드(최신 파일을 가장 먼저 불러움)
+df_2 = pd.read_csv("csvs/csv_1765351338.csv") # 2차
+# df_3 = pd.read_csv("csvs/csv_1764930924.csv")
+# df_4 = pd.read_csv("csvs/csv_1764930620.csv")
+# df_5 = pd.read_csv("csvs/csv_1764930430.csv")
 
 class Draw_Correct_Course:
     def __init__(self):
@@ -64,7 +70,16 @@ x_range, y_range, z_range = answer_course.get_course()
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
+# 실제로 날아간 경로
 ax.plot(df['x_pos'], df['y_pos'], df['z_pos'], label='actual_route', color='red')
+
+# 과거 경로 중첩(최신 데이터를 먼저 그림)
+ax.plot(df_2['x_pos'], df_2['y_pos'], df_2['z_pos'], label='actual_route_2', color='orange') # 2치
+# ax.plot(df_3['x_pos'], df_3['y_pos'], df_3['z_pos'], label='actual_route_2', color='green')
+# ax.plot(df_4['x_pos'], df_4['y_pos'], df_4['z_pos'], label='actual_route_3', color='darkgreen')
+# ax.plot(df_5['x_pos'], df_5['y_pos'], df_5['z_pos'], label='actual_route_4', color='darkblue')
+
+# 이상적인 경로
 ax.plot(x_range, y_range, z_range, ls='--', label='correct_route', color='skyblue')
 
 ax.grid()

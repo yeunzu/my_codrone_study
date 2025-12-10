@@ -3,7 +3,8 @@ import pandas as pd
 import math
 
 
-csv_file = "csvs/csv_1764930995.csv"
+csv_file = "csvs/csv_1765351154.csv" # 1차
+csv_file = "csvs/csv_1765351338.csv" # 2차
 df = pd.read_csv(csv_file)
 
 
